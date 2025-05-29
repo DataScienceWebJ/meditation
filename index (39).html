@@ -1,0 +1,278 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Медитация и Таймер</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Анимация появления контейнера */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.7s ease-in-out;
+    }
+    /* Фон с водой и анимацией волн */
+    .bg-water {
+      background: linear-gradient(180deg, rgba(0, 105, 148, 0.7), rgba(0, 191, 255, 0.7));
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      min-height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+    .bg-water::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('https://source.unsplash.com/1600x900/?waterfall') no-repeat center/cover;
+      opacity: 0.3;
+      z-index: -1;
+    }
+    .bg-water::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.2) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0.2) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 60px 60px;
+      animation: wave 8s linear infinite;
+      z-index: -1;
+    }
+    @keyframes wave {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-60px); }
+    }
+    /* Стили для модального окна */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      max-width: 32rem;
+      width: 100%;
+      margin: 1rem;
+    }
+  </style>
+</head>
+<body class="bg-water flex flex-col min-h-screen">
+  <!-- Навигация -->
+  <nav class="bg-blue-700 bg-opacity-90 p-4">
+    <div class="container mx-auto flex justify-between items-center">
+      <a href="index.html" class="text-white text-lg font-bold">Медитация</a>
+      <div class="space-x-4">
+        <a href="index.html" class="text-white hover:text-blue-200 transition">Таймер</a>
+        <button id="aboutBtn" class="text-white hover:text-blue-200 transition">О медитации</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Главный контейнер -->
+  <main class="flex-grow flex items-center justify-center p-4">
+    <div class="bg-white bg-opacity-80 p-6 sm:p-8 rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
+      <!-- Заголовок -->
+      <h1 class="text-2xl sm:text-3xl font-bold text-center text-blue-800 mb-6">Медитация у Воды</h1>
+      
+      <!-- Выбор времени -->
+      <div class="mb-6">
+        <label for="duration" class="block text-sm font-medium text-gray-800 mb-2">Выберите время:</label>
+        <select id="duration" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none transition bg-white bg-opacity-90">
+          <option value="5">5 минут</option>
+          <option value="10">10 минут</option>
+          <option value="15">15 минут</option>
+          <option value="20">20 минут</option>
+        </select>
+      </div>
+
+      <!-- Таймер -->
+      <div class="text-center mb-6">
+        <span id="timer" class="text-4xl sm:text-5xl font-mono text-blue-800">00:00</span>
+      </div>
+
+      <!-- Кнопки -->
+      <div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+        <button id="startBtn" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition disabled:bg-blue-300">Старт</button>
+        <button id="resetBtn" class="bg-teal-500 text-white px-6 py-3 rounded-lg hover:bg-teal-600 transition disabled:bg-teal-300" disabled>Сброс</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Модальное окно -->
+  <div id="modal" class="modal">
+    <div class="modal-content animate-fadeIn">
+      <h2 class="text-xl sm:text-2xl font-bold text-blue-800 mb-4">О медитации</h2>
+      <p class="text-gray-700 mb-4">Медитация — это практика, которая помогает успокоить ум, улучшить концентрацию и снизить уровень стресса. Она используется тысячелетиями в различных культурах для достижения гармонии и внутреннего покоя.</p>
+      <h3 class="text-lg font-semibold text-blue-700 mb-2">Польза медитации:</h3>
+      <ul class="list-disc list-inside text-gray-700 mb-4">
+        <li>Снижение стресса и тревожности.</li>
+        <li>Улучшение концентрации и внимания.</li>
+        <li>Повышение эмоционального благополучия.</li>
+        <li>Улучшение качества сна.</li>
+      </ul>
+      <h3 class="text-lg font-semibold text-blue-700 mb-2">Как начать:</h3>
+      <p class="text-gray-700 mb-4">Найдите тихое место, сядьте удобно, закройте глаза и сосредоточьтесь на дыхании. Используйте наш таймер, чтобы установить продолжительность сессии.</p>
+      <button id="closeModal" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Аудио для звука воды -->
+  <audio id="waterSound" loop>
+    <source src="https://www.zapsplat.com/wp-content/uploads/2015/sound-effects-77328/zapsplat_nature_water_stream_flow_light_bubble_001_77328.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    // Элементы DOM
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const timerDisplay = document.getElementById('timer');
+    const durationSelect = document.getElementById('duration');
+    const aboutBtn = document.getElementById('aboutBtn');
+    const modal = document.getElementById('modal');
+    const closeModal = document.getElementById('closeModal');
+    const waterSound = document.getElementById('waterSound');
+    let timerInterval = null;
+    let timeLeft = 0;
+
+    // Инициализация Web Audio API для звука колокольчика
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Функция воспроизведения звука колокольчика
+    function playBell() {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 1);
+    }
+
+    // Обновление отображения таймера
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Запуск таймера
+    function startTimer() {
+      timeLeft = parseInt(durationSelect.value) * 60;
+      updateTimerDisplay();
+      playBell(); // Звук в начале
+      waterSound.play(); // Воспроизведение звука воды
+      startBtn.disabled = true;
+      resetBtn.disabled = false;
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          playBell(); // Звук в конце
+          waterSound.pause(); // Остановка звука воды
+          waterSound.currentTime = 0;
+          startBtn.disabled = false;
+          resetBtn.disabled = true;
+        }
+      }, 1000);
+    }
+
+    // Сброс таймера
+    function resetTimer() {
+      clearInterval(timerInterval);
+      timeLeft = 0;
+      updateTimerDisplay();
+      waterSound.pause(); // Остановка звука воды
+      waterSound.currentTime = 0;
+      startBtn.disabled = false;
+      resetBtn.disabled = true;
+    }
+
+    // Управление модальным окном
+    aboutBtn.addEventListener('click', () => {
+      modal.style.display = 'flex';
+    });
+    closeModal.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+
+    // Обработчики событий
+    startBtn.addEventListener('click', startTimer);
+    resetBtn.addEventListener('click', resetTimer);
+  </script>
+</body>
+</html>
